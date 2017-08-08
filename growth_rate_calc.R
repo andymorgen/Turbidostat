@@ -1,6 +1,11 @@
+# load necessary packages
+library(reshape2)
+library(ggplot2)
+library(scales)
+
 #set working dir to location of dat files
 # V. IMPORTANT. CHANGE THIS SO I DON'T OVERWRITE EXISTING FILES.
-setwd("/Users/andrewmorgenthaler/Google Drive/MCDB/Copley/AMorgenthaler_lab_notebook/data_files/turbidostat/2017-03-27_Sphingobium_TNseq_1/")
+setwd("/Users/andrewmorgenthaler/Google Drive/MCDB/Copley/AMorgenthaler_lab_notebook/data_files/turbidostat/2017-05-01_glucoseconctest/")
 
 #see what files are in there
 list.files(getwd())
@@ -203,69 +208,130 @@ gr.ods[!is.na(gr.ods$gr) & gr.ods$gr > upperlimit | !is.na(gr.ods$gr) & gr.ods$g
 #7. Calculate average growth rate for each day.
 gr.ods$day <- ceiling((gr.ods$T1 - gr.ods[1,1])/86400)
 mean.gr <- t(tapply(gr.ods$gr, INDEX = list(gr.ods$chamber, gr.ods$day), mean, na.rm = TRUE)[,-1])
-# in mean.gr...
-# columns = chambers
-# rows = days
+# mean.gr matrix:
+#   columns = chambers
+#   rows = days
 
+#reformat matrix to long data frame for easy plotting
+# using reshape2 package:
+mean.gr.df <- as.data.frame(mean.gr)
+mean.gr.df$day <- 1:nrow(mean.gr.df)
+mean.gr.df.long <- melt(mean.gr.df, id.vars = "day")
+colnames(mean.gr.df.long)[c(2,3)] <- c('chamber','gr')
+
+# not using reshape2 package:
+# mean.gr.long <- reshape(as.data.frame(mean.gr), 
+#                         varying = as.character(c(1:ncol(mean.gr))),
+#                         v.names = "gr",
+#                         direction="long")
+# colnames(mean.gr.long) <- c("chamber","gr","day")
 
 #8. Plot growth rates
-mean.gr.long <- reshape(as.data.frame(mean.gr), 
-                        varying = as.character(c(1:ncol(mean.gr))),
-                        v.names = "gr",
-                        direction="long")
-colnames(mean.gr.long) <- c("chamber","gr","day")
+# Histogram of growth rates by chamber by day. Set 'day' to desired number.
+day <- 11
+# using base R plotting functions
+# palette(rainbow(8))
+# op <- par(mar = c(5.1,4.1,4.1,2.1), mfrow = c(2,4))
+# for (i in min(unique(gr.ods$chamber)):max(unique(gr.ods$chamber))){
+#   hist(gr.ods[gr.ods$day==day & gr.ods$chamber==i, 7],
+#        breaks = seq(from = lowerlimit, to = upperlimit, length.out = 25),
+#        col = i,
+#        xlab = expression("growth rate" ~ (hr^{-1})),
+#        main = paste('chamber', i, ',', 'day', day),
+#        ylim = c(0,275)
+#   )
+# }
+# par(op)
 
-# Histogram of growth rates by chamber by day. Set 'day' and 'chamber' objects to desired numbers.
-day <- 3
-palette(rainbow(8))
-op <- par(mar = c(5.1,4.1,4.1,2.1), mfrow = c(2,4))
-for (i in min(unique(gr.ods$chamber)):max(unique(gr.ods$chamber))){
-  hist(gr.ods[gr.ods$day==day & gr.ods$chamber==i, 7],
-       breaks = seq(from = lowerlimit, to = upperlimit, length.out = 25),
-       col = i,
-       xlab = expression("growth rate" ~ (hr^{-1})),
-       main = paste('chamber', i, ',', 'day', day),
-       ylim = c(0,200)
-  )
+# using ggplot2 package
+gr.ods.hist <- gr.ods[gr.ods$day==day, ]
+gr.ods.hist.stat <- data.frame("mean" = as.numeric(tapply(gr.ods.hist$gr, INDEX = gr.ods.hist$chamber, FUN = mean, na.rm = TRUE)),
+                               "sd" = as.numeric(tapply(gr.ods.hist$gr, INDEX = gr.ods.hist$chamber, FUN = sd, na.rm = TRUE)),
+                               "chamber" = as.numeric(unique(gr.ods.hist$chamber)))
+chambers.headers <- list('1'=bquote(bar(x) ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==1, 'mean'],2)) ~', '~ sigma ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==1, 'sd'],2))),
+                         '2'=bquote(bar(x) ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==2, 'mean'],2)) ~', '~ sigma ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==2, 'sd'],2))),
+                         '3'=bquote(bar(x) ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==3, 'mean'],2)) ~', '~ sigma ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==3, 'sd'],2))),
+                         '4'=bquote(bar(x) ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==4, 'mean'],2)) ~', '~ sigma ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==4, 'sd'],2))),
+                         '5'=bquote(bar(x) ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==5, 'mean'],2)) ~', '~ sigma ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==5, 'sd'],2))),
+                         '6'=bquote(bar(x) ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==6, 'mean'],2)) ~', '~ sigma ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==6, 'sd'],2))),
+                         '7'=bquote(bar(x) ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==7, 'mean'],2)) ~', '~ sigma ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==7, 'sd'],2))),
+                         '8'=bquote(bar(x) ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==8, 'mean'],2)) ~', '~ sigma ~'='~ .(round(gr.ods.hist.stat[gr.ods.hist.stat$chamber==8, 'sd'],2))))
+histogram.labeller <- function(variable,value){
+  return(chambers.headers[value])
 }
-par(op)
+
+ggplot(data = gr.ods.hist, aes(x = gr, fill = factor(chamber))) +
+  geom_histogram(color = 'black', breaks = seq(from = lowerlimit, to = upperlimit, length.out = 25)) +
+  facet_wrap(~ chamber, ncol = 4, labeller = histogram.labeller) +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  theme(legend.key = element_blank()) +
+  labs(title = 'Distribution of calculated growth rates',
+       subtitle = paste('day', day),
+       x = expression(bold("growth rate" ~ (hr^bold('-1'))))) +
+  guides(fill=guide_legend(title="chamber")) +
+  theme(text = element_text(family="Myriad Pro"),
+        axis.text=element_text(size=12),
+        axis.title=element_text(size=18,face="bold"),
+        legend.text=element_text(size=18),
+        legend.title=element_text(size=18,face="bold"),
+        plot.title=element_text(size=28,face="bold"),
+        plot.subtitle = element_text(size=20, face = "italic"),
+        strip.text.x = element_text(size = 14))
+
 
 # Mean growth rate plot
-op <- par(mar = c(5.1,5.1,4.1,8.1), xpd = TRUE, las = 1, cex.lab = 1.4, cex.axis = 1.2, cex.main = 1.4)
-palette(rainbow(8))
-matplot(mean.gr,
-        type = "n",
-        main = "growth rate by chamber",
-        xlab = "day",
-        ylab = expression("growth rate" ~ (hr^{-1})),
-        bty = 'n',
-        axes = FALSE,
-        ylim = c(0,1),
-        xlim = c(0.8,nrow(mean.gr)))
-axis(1, pos = 0, lwd = 2, at = 1:4)
-axis(1, pos = 0, lwd = 2, at = c(0.8,1), labels=c("",""), lwd.ticks=0)
-axis(2, pos = 0.8, lwd = 2)
-for (i in 1:ncol(mean.gr)){
-  lines(mean.gr[,i],
-        lty = 1,
-        lwd = 2,
-        pch = 19,
-        lend = 1,
-        col = i)
-}
-for (i in 1:ncol(mean.gr)){
-  points(mean.gr[,i],
-         pch = 19,
-         col = i)
-}
-legend("topright",
-       inset = c(-0.1,0),
-       legend = colnames(mean.gr),
-       title = "chamber",
-       cex = 1.5,
-       col = palette(),
-       pch = 19,
-       y.intersp = 1)
-par(op)
+# using base R plotting fuctions
+# op <- par(mar = c(5.1,5.1,4.1,8.1), xpd = TRUE, las = 1, cex.lab = 1.4, cex.axis = 1.2, cex.main = 1.4)
+# palette(rainbow(8))
+# matplot(mean.gr,
+#         type = "n",
+#         main = "growth rate by chamber",
+#         xlab = "day",
+#         ylab = expression("growth rate" ~ (hr^{-1})),
+#         bty = 'n',
+#         axes = FALSE,
+#         ylim = c(0,0.8),
+#         xlim = c(0.8,nrow(mean.gr)))
+# axis(1, pos = 0, lwd = 2, at = 1:nrow(mean.gr))
+# axis(1, pos = 0, lwd = 2, at = c(0.8,1), labels=c("",""), lwd.ticks=0)
+# axis(2, pos = 0.8, lwd = 2)
+# for (i in 1:ncol(mean.gr)){
+#   lines(mean.gr[,i],
+#         lty = 1,
+#         lwd = 2,
+#         pch = 19,
+#         lend = 1,
+#         col = i)
+# }
+# for (i in 1:ncol(mean.gr)){
+#   points(mean.gr[,i],
+#          pch = 19,
+#          col = i)
+# }
+# legend("topright",
+#        inset = c(-0.1,0),
+#        legend = colnames(mean.gr),
+#        title = "chamber",
+#        cex = 1.5,
+#        col = palette(),
+#        pch = 19,
+#        y.intersp = 1)
+# par(op)
 
-mean.gr
+# using ggplot2 functions
+ggplot(data = mean.gr.df.long, aes(x = day, y = gr, color = factor(chamber), group = factor(chamber))) +
+  geom_point() +
+  geom_line(size = 1) +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(limits = c(0,0.8), breaks = pretty_breaks()) +
+  labs(color = "chamber") +
+  theme(legend.key = element_blank()) +
+  ggtitle("Mean growth rates") +
+  ylab(expression(bold("growth rate" ~ (hr^bold('-1'))))) +
+  theme(text = element_text(family="Myriad Pro"),
+        axis.text=element_text(size=18),
+        axis.title=element_text(size=20,face="bold"),
+        legend.text=element_text(size=18),
+        legend.title=element_text(size=18,face="bold"),
+        plot.title=element_text(size=28,face="bold"))
+
